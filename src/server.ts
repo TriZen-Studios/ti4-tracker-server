@@ -15,8 +15,14 @@ const wssOptions: ServerOptions = {
 };
 const webSocketServer = new Server(wssOptions);
 
-const lobby = {};
-
+const DUMMY_SESSIONS = [
+  {
+    data: ["session #1"]
+  },
+  {
+    data: ["session #2"]
+  }
+];
 function handleMessage(event: MessageEvent) {
   try {
     const data = event.data as string;
@@ -27,25 +33,37 @@ function handleMessage(event: MessageEvent) {
   }
 }
 
-function handleParsedMessage(webSocket: WebSocket, json: string) {
-  const playerId = _.get(webSocket, "id");
+function handleParsedMessage(webSocketClient: WebSocket, json: string) {
+  const playerId = _.get(webSocketClient, "id");
   const action = _.get(json, "action");
 
+  let payload: any = {
+    action: null,
+    data: null
+  };
+
   switch (action) {
-    case "CREATE_LOBBY":
-    case "JOIN_LOBBY":
+    case "GET_GAME_SESSIONS":
+      payload = _.merge({}, payload, {
+        data: DUMMY_SESSIONS,
+        action
+      });
+      break;
     default:
       throw new Error(`${action} not implemented`);
   }
+
+  webSocketClient.send(JSON.stringify(payload));
 }
 
 // Emitted when the handshake is complete
-webSocketServer.on("connection", (webSocket: WebSocket, request: IncomingMessage) => {
+webSocketServer.on("connection", (webSocketClient: WebSocket, request: IncomingMessage) => {
   const parsedUrl = url.parse(request.url || "");
   const parseQs = qs.parse(parsedUrl.query || "");
-  _.set(webSocket, "id", parseQs["id"]);
-  webSocket.onmessage = handleMessage;
-  webSocket.send("connected");
+  _.set(webSocketClient, "id", parseQs["id"]);
+  webSocketClient.onmessage = handleMessage;
+
+  webSocketClient.send("connected");
 });
 
 // Emitted when an error occurs on the underlying server.
