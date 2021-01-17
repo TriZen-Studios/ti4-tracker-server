@@ -58,8 +58,9 @@ function handleParsedMessage(webSocketClient: WebSocket, request: string) {
 
 function createGameSession(webSocketClient: WebSocket, data: any) {
   const session = {
-    name: data.name,
-    players: {}
+    host: data.name,
+    players: {},
+    status: "open"
   };
   sessions[data.sessionId] = session;
   webSocketClient.send(
@@ -90,12 +91,20 @@ function addPlayerToSession(webSocketClient: WebSocket, data: any) {
 }
 
 function removePlayerFromSession(webSocketClient: WebSocket, data: any) {
-  _.unset(sessions[data.sessionId].players, `${data.playerId}`);
-  if (data.sessionId == data.playerId) {
-    console.log("host leaving the game");
-  }
+  const otherPlayers = sessions[data.sessionId].players;
+  let response;
 
-  const response = JSON.stringify({
+  _.unset(sessions[data.sessionId].players, `${data.playerId}`);
+  // host leaving the game
+  if (data.sessionId == data.playerId) {
+    // remove all players from lobby
+    _.unset(sessions[data.sessionId], "players");
+    // set session to close
+    sessions[data.sessionId].status = "closed"
+
+  }
+  // player leaving the game
+  response = JSON.stringify({
     action: "UPDATE_STATE",
     path: "sessions",
     value: sessions
@@ -103,7 +112,7 @@ function removePlayerFromSession(webSocketClient: WebSocket, data: any) {
 
   // update the player who left the session since he won't be in the players collection anymore
   webSocketClient.send(response);
-  notifyPlayers(sessions[data.sessionId].players, response);
+  notifyPlayers(otherPlayers, response);
 }
 
 function notifyPlayers(players: any, response: any) {
